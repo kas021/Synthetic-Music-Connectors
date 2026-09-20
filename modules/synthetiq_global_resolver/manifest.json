@@ -1,0 +1,28 @@
+{
+  "id": "synthetiq-global-resolver-v1",
+  "name": "Global Resolver",
+  "description": "Full-length streams (Qobuz FLAC/Hi-Res, verified to 120 MB continuous) with Apple Music catalogue search, through a community resolver instance.",
+  "type": "client",
+  "contentType": "music",
+  "contractVersion": 4,
+  "formatVersion": 3,
+  "moduleVersion": "1.0.0",
+  "moduleFamilyId": "synthetiq_global_resolver",
+  "moduleIdentity": "SP-MUS-3030-GLOBAL-RESOLVER",
+  "moduleIdentityNumber": 3030,
+  "releaseTrack": "staging",
+  "baseUrl": "https://stop-using-my-instance.anothermoumen4.workers.dev",
+  "config": {
+    "runtime": {
+      "mode": "local",
+      "entry": "index.js"
+    },
+    "caps": {
+      "timeoutMs": 30000,
+      "maxConcurrentRequests": 1
+    },
+    "playbackMode": "full",
+    "allowOfflineDownload": false
+  },
+  "moduleStatus": "staging"
+}

@@ -48,6 +48,51 @@
         "recommended": false,
         "language": "Multi-language"
       }
+    },
+    {
+      "moduleId": "synthetiq-global-resolver-v1",
+      "moduleFamilyId": "synthetiq_global_resolver",
+      "moduleIdentity": "SP-MUS-3030-GLOBAL-RESOLVER",
+      "moduleIdentityNumber": 3030,
+      "contentType": "music",
+      "version": "1.0.0",
+      "releaseTrack": "staging",
+      "file": "packages/Global-Resolver-1.0.0.zip",
+      "sha256": "a218c52ac38fd4673c48f3c11164e5d7cb13d85028c2b94310d0bf0b30cdc2b6",
+      "publishedAt": "2026-09-20T18:11:05Z",
+      "changelog": [
+        "Full-length stream resolution verified to 120 MB continuous (24-bit/88.2 kHz FLAC) through the community resolver instance.",
+        "Apple Music catalogue search with Qobuz-first stream resolution.",
+        "No credentials required; offline download disabled; honest failure paths."
+      ],
+      "presentation": {
+        "category": "Music",
+        "purpose": "Hi-res full-length music connector",
+        "recommended": true,
+        "language": "Multi-language"
+      }
+    },
+    {
+      "moduleId": "synthetiq-ytmusic-direct-v1",
+      "moduleFamilyId": "synthetiq_ytmusic_direct",
+      "moduleIdentity": "SP-MUS-3031-YTMUSIC-DIRECT",
+      "moduleIdentityNumber": 3031,
+      "contentType": "music",
+      "version": "1.0.0",
+      "releaseTrack": "staging",
+      "file": "packages/YT-Music-Direct-1.0.0.zip",
+      "sha256": "c4de424e0a9dde50f1e90032985291bf31e26c18f9092b4b54ac01fe98de5d37",
+      "publishedAt": "2026-09-20T18:11:05Z",
+      "changelog": [
+        "YouTube Music search via InnerTube (WEB_REMIX).",
+        "Playback guarded: detects YouTube's unsigned-stream restriction and reports it honestly; recovers automatically when lifted."
+      ],
+      "presentation": {
+        "category": "Music",
+        "purpose": "Testing - YouTube search (playback pending upstream)",
+        "recommended": false,
+        "language": "Multi-language"
+      }
     }
   ]
 }

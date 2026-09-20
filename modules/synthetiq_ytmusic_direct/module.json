@@ -1,0 +1,28 @@
+{
+  "id": "synthetiq-ytmusic-direct-v1",
+  "name": "YT Music Direct",
+  "description": "YouTube Music search (works). Playback is currently blocked upstream for unsigned sources; the module detects this and reports it honestly instead of stopping mid-song.",
+  "type": "client",
+  "contentType": "music",
+  "contractVersion": 4,
+  "formatVersion": 3,
+  "moduleVersion": "1.0.0",
+  "moduleFamilyId": "synthetiq_ytmusic_direct",
+  "moduleIdentity": "SP-MUS-3031-YTMUSIC-DIRECT",
+  "moduleIdentityNumber": 3031,
+  "releaseTrack": "staging",
+  "baseUrl": "https://music.youtube.com",
+  "config": {
+    "runtime": {
+      "mode": "local",
+      "entry": "index.js"
+    },
+    "caps": {
+      "timeoutMs": 20000,
+      "maxConcurrentRequests": 1
+    },
+    "playbackMode": "full",
+    "allowOfflineDownload": false
+  },
+  "moduleStatus": "staging"
+}
