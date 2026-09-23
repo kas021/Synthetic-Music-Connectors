@@ -113,8 +113,8 @@
           }
 
           tracks.push({
-            id: 'freefy:' + videoId,
-            href: 'freefy:' + videoId,
+            id: 'freefy:yt:' + videoId,
+            href: 'freefy:yt:' + videoId,
             type: 'track',
             title,
             artist,
@@ -131,13 +131,13 @@
     // Fallback to ListenFree mirrors
     for (const mirror of LISTENFREE_MIRRORS) {
       try {
-        const url = mirror + '/search/songs?query=' + encodeURIComponent(term) + '&limit=20';
+        const url = mirror + '/search/songs?query=' + encodeURIComponent(term) + '&page=' + (Math.max(0, Number(page) || 0) + 1) + '&limit=20';
         const res = await getJson(url);
         const results = res?.data?.results || [];
         if (results.length > 0) {
           const tracks = results.map(r => ({
-            id: 'freefy:' + (r.id || ''),
-            href: 'freefy:' + (r.id || ''),
+            id: 'freefy:saavn:' + (r.id || ''),
+            href: 'freefy:saavn:' + (r.id || ''),
             type: 'track',
             title: String(r.name || r.title || 'Track'),
             artist: String(r.primaryArtists || r.artists?.primary?.[0]?.name || 'Unknown Artist'),
@@ -154,18 +154,22 @@
   }
 
   async function extractAudioUrl(trackId, quality) {
-    const cleanId = String(trackId || '').replace(/^(freefy|yt|song|track):/, '').trim();
+    const ref = String(trackId || '').trim().match(/^freefy:(yt|saavn):([A-Za-z0-9_-]+)$/);
+    if (!ref) return fail('This legacy track has an ambiguous provider identity. Search again to refresh it.');
+    if (ref[1] === 'yt') return fail('YouTube metadata is available, but this source has no verified YouTube playback route.');
+    const cleanId = ref[2];
 
     // 1. Try ListenFree mirrors for direct 320kbps MP4 Akamai CDN stream
     for (const mirror of LISTENFREE_MIRRORS) {
       try {
         const res = await getJson(mirror + '/songs/' + cleanId);
-        const songData = Array.isArray(res?.data) ? res.data[0] : res?.data;
+        const rows = Array.isArray(res?.data) ? res.data : [res?.data];
+        const songData = rows.find(row => row && String(row.id || '') === cleanId);
         if (songData && Array.isArray(songData.downloadUrl)) {
           let stream320 = null;
           let fallback = null;
           for (const d of songData.downloadUrl) {
-            if (d?.url) {
+            if (d?.url && /^https:\/\//i.test(String(d.url))) {
               if (String(d.quality).includes('320')) stream320 = d.url;
               fallback = d.url;
             }
@@ -178,7 +182,7 @@
               mimeType: 'audio/mp4',
               extension: 'mp4',
               title: songData.name || 'Track',
-              artist: songData.primaryArtists || 'Unknown Artist',
+              artist: songData.primaryArtists || (songData.artists?.primary || []).map(a => a.name).filter(Boolean).join(', ') || 'Unknown Artist',
               album: songData.album?.name || '',
               artwork: Array.isArray(songData.image) ? songData.image[songData.image.length - 1]?.url : songData.image || '',
               durationSeconds: Number(songData.duration) || undefined,
@@ -189,17 +193,7 @@
       } catch (_) {}
     }
 
-    // 2. Fallback to search query if trackId is not direct
-    try {
-      const searchRes = await searchResults(cleanId, 0);
-      if (searchRes.ok) {
-        const items = JSON.parse(searchRes.data);
-        if (items.length > 0 && items[0].id !== trackId) {
-          return extractAudioUrl(items[0].id, quality);
-        }
-      }
-    } catch (_) {}
-
+    // Provider IDs are not search queries. Never substitute the first result.
     return fail('No full-length audio stream is available for this track.');
   }
 
@@ -211,8 +205,8 @@
         const data = res?.data;
         if (data) {
           const tracks = (data.songs || []).map(s => ({
-            id: 'freefy:' + s.id,
-            href: 'freefy:' + s.id,
+            id: 'freefy:saavn:' + s.id,
+            href: 'freefy:saavn:' + s.id,
             type: 'track',
             title: String(s.name || 'Track'),
             artist: String(s.primaryArtists || 'Unknown Artist'),
@@ -259,8 +253,7 @@
   }
 
   async function getRelatedTracks(seedId) {
-    const res = await searchResults('similar music', 0);
-    return res;
+    return ok([]); // No verified seed relationship is supplied by this source.
   }
 
   globalThis.searchResults = searchResults;

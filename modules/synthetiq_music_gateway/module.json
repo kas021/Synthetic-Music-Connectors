@@ -6,7 +6,7 @@
   "contentType": "music",
   "contractVersion": 4,
   "formatVersion": 3,
-  "moduleVersion": "1.4.0",
+  "moduleVersion": "1.4.2",
   "moduleFamilyId": "synthetiq_music_gateway",
   "moduleIdentity": "SP-MUS-3006-MUSIC-GATEWAY",
   "moduleIdentityNumber": 3006,
@@ -15,7 +15,8 @@
   "config": {
     "capabilities": {
       "music_home_v1": true,
-      "local_listening_stats_v1": true
+      "local_listening_stats_v1": true,
+      "music_radio_v1": true
     },
     "runtime": {
       "mode": "local",
@@ -25,7 +26,7 @@
       "homeMaxResults": 24,
       "maxResponseBytes": 524288,
       "timeoutMs": 12000,
-      "maxConcurrentRequests": 2
+      "maxConcurrentRequests": 1
     },
     "playbackMode": "full",
     "allowOfflineDownload": true

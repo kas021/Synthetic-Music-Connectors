@@ -65,6 +65,79 @@
     return 'flac';
   }
 
+  function text(value) {
+    return typeof value === 'string' ? value.trim() : '';
+  }
+
+  function isrc(value) {
+    return text(value).replace(/[^A-Za-z0-9]/g, '').toUpperCase();
+  }
+
+  function presentationTitle(value) {
+    return text(value).replace(/\s*\((?:feat\.?|ft\.?|featuring)\s+[^)]*\)/gi, '')
+      .replace(/\s+(?:feat\.?|ft\.?|featuring)\s+.+$/i, '')
+      .normalize('NFKC').toLowerCase().replace(/[^\p{L}\p{N}]/gu, '');
+  }
+
+  function presentationArtist(value) {
+    return text(value).split(/\s*(?:,|&|\bfeat\.?\s|\bfeaturing\s)\s*/i)[0]
+      .normalize('NFKC').toLowerCase().replace(/[^\p{L}\p{N}]/gu, '');
+  }
+
+  function actualRecording(data, requestedId) {
+    var apple = data && data.apple;
+    var track = data && data.track;
+    var file = data && data.file;
+    if (apple && apple.id != null && String(apple.id) !== requestedId) return null;
+    if (!track || typeof track !== 'object') return null;
+    if (file && file.track_id != null && track.id != null &&
+        String(file.track_id) !== String(track.id)) return null;
+    var expectedIsrc = isrc(apple && apple.isrc);
+    var actualIsrc = isrc(track.isrc);
+    if (expectedIsrc && actualIsrc && expectedIsrc !== actualIsrc) return null;
+    var title = text(track.title);
+    var artist = text(track.performer && track.performer.name) ||
+      text(track.artist && track.artist.name) || text(track.artist);
+    if (!title || !artist || /^unknown (track|artist)$/i.test(title) ||
+        /^unknown (track|artist)$/i.test(artist)) return null;
+    var duration = Number(track.duration);
+    var album = text(track.album && track.album.title) || text(track.album);
+    var appleTitle = text(apple && apple.title);
+    var appleArtist = text(apple && apple.artist);
+    // A verified identical ISRC permits catalogue presentation (e.g. a
+    // featuring suffix), never relabelling a merely plausible audio match.
+    var verifiedPresentation = apple && String(apple.id) === requestedId &&
+      expectedIsrc && expectedIsrc === actualIsrc && appleTitle && appleArtist &&
+      presentationTitle(appleTitle) === presentationTitle(title) &&
+      presentationArtist(appleArtist) === presentationArtist(artist);
+    return {
+      title: verifiedPresentation ? appleTitle : title,
+      artist: verifiedPresentation ? appleArtist : artist,
+      album: verifiedPresentation ? text(apple.album) || album : album,
+      resolvedTitle: title,
+      resolvedArtist: artist,
+      resolvedAlbum: album,
+      identityEvidence: verifiedPresentation ? 'matching_isrc_and_requested_id' : 'provider_recording_metadata',
+      durationSeconds: duration > 0 ? duration : undefined,
+      providerTrackId: track.id == null ? undefined : String(track.id),
+      isrc: actualIsrc || undefined
+    };
+  }
+
+  function responseHeaders(data) {
+    // Preserve only headers explicitly paired with this resolver response.
+    var source = data.headers || (data.file && data.file.headers);
+    var result = {};
+    if (!source || typeof source !== 'object' || Array.isArray(source)) return result;
+    Object.keys(source).forEach(function (key) {
+      if (/^[!#$%&'*+.^_`|~0-9A-Za-z-]+$/.test(key) &&
+          typeof source[key] === 'string' && !/[\r\n]/.test(source[key])) {
+        Object.defineProperty(result, key, {value: source[key], enumerable: true});
+      }
+    });
+    return result;
+  }
+
   function mapTrack(item) {
     if (!item || item.id == null) return null;
     var id = String(item.id);
@@ -113,9 +186,21 @@
       if (typeof url !== 'string' || url.indexOf('https://') !== 0) {
         return fail('Resolver returned no playable stream for this track.');
       }
+      var recording = actualRecording(data, id);
+      if (!recording) return fail('Resolver recording identity is missing or does not match.');
       return ok({
         url: url,
-        headers: {},
+        headers: responseHeaders(data),
+        title: recording.title,
+        artist: recording.artist,
+        album: recording.album,
+        durationSeconds: recording.durationSeconds,
+        providerTrackId: recording.providerTrackId,
+        isrc: recording.isrc,
+        resolvedTitle: recording.resolvedTitle,
+        resolvedArtist: recording.resolvedArtist,
+        resolvedAlbum: recording.resolvedAlbum,
+        identityEvidence: recording.identityEvidence,
         mimeType: data.mimeType || 'audio/flac',
         extension: extensionFor(data.mimeType),
         quality: data.audioQuality || data.quality || 'high',

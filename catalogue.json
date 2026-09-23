@@ -8,12 +8,15 @@
       "moduleIdentity": "SP-MUS-3006-MUSIC-GATEWAY",
       "moduleIdentityNumber": 3006,
       "contentType": "music",
-      "version": "1.4.0",
+      "version": "1.4.2",
       "releaseTrack": "staging",
-      "file": "packages/Synthetiq-Music-Gateway-1.4.0.zip",
-      "sha256": "9fcd74364c23fdc7368514caa653a9c65deeb3c218f5033d845101109add712b",
-      "publishedAt": "2026-08-22T17:34:00Z",
+      "file": "packages/Synthetiq-Music-Gateway-1.4.2.zip",
+      "sha256": "07e5237b0f31060a94c0af403e6af5c7a5f5146048f3cc3afe68d898ef04c232",
+      "publishedAt": "2026-09-23T21:30:40Z",
       "changelog": [
+        "Strict recording identity: exact provider IDs, Unicode-safe matching, bounded candidate search; no opaque-ID recursion.",
+        "Genuine source suggestions exposed via music_radio_v1 (Smart Radio) and related tracks; honest failures instead of filler.",
+        "Runtime concurrency capped at one operation; album and home endpoints unchanged.",
         "Fixed seek bar and stream duration resolution.",
         "Unified high-fidelity music search and 320kbps full-length stream resolution.",
         "Added in-module DES-ECB cipher hardware decryption for direct Akamai CDN MP4 audio.",
@@ -21,7 +24,7 @@
       ],
       "presentation": {
         "category": "Music",
-        "purpose": "Primary music connector",
+        "purpose": "Primary music connector - JioSaavn catalogue, verified playback and Smart Radio",
         "recommended": true,
         "language": "Multi-language"
       }
@@ -32,19 +35,21 @@
       "moduleIdentity": "SP-MUS-3010-FREEFY",
       "moduleIdentityNumber": 3010,
       "contentType": "music",
-      "version": "1.0.0",
+      "version": "1.0.1",
       "releaseTrack": "production",
-      "file": "packages/Freefy-Music-1.0.0.zip",
-      "sha256": "dd9b90e6bd80a5c5d250555ee7cead5fb67addbf3faccd3b4a02a0eb5caab8dd",
-      "publishedAt": "2026-08-22T18:38:00Z",
+      "file": "packages/Freefy-Music-1.0.1.zip",
+      "sha256": "5ab978371d8051d58662efbe4201a1e9267eb0bf563855e9ec1e1fdd1b41d17c",
+      "publishedAt": "2026-09-23T21:30:40Z",
       "changelog": [
+        "Provider-qualified IDs (freefy:yt: / freefy:saavn:); legacy ambiguous IDs fail with a refresh message instead of guessing.",
+        "Removed recursive first-result substitution and the fake \"similar music\" related search; no implied YouTube playback.",
         "Worldwide YouTube Music search aggregator integration.",
         "High-fidelity 320kbps full-length playback with mirror fallbacks.",
         "Offline playback support."
       ],
       "presentation": {
         "category": "Music",
-        "purpose": "Worldwide fallback music connector",
+        "purpose": "YouTube metadata search; verified JioSaavn playback only",
         "recommended": false,
         "language": "Multi-language"
       }
@@ -55,20 +60,23 @@
       "moduleIdentity": "SP-MUS-3030-GLOBAL-RESOLVER",
       "moduleIdentityNumber": 3030,
       "contentType": "music",
-      "version": "1.0.0",
+      "version": "1.0.1",
       "releaseTrack": "staging",
-      "file": "packages/Global-Resolver-1.0.0.zip",
-      "sha256": "a218c52ac38fd4673c48f3c11164e5d7cb13d85028c2b94310d0bf0b30cdc2b6",
-      "publishedAt": "2026-09-20T18:11:05Z",
+      "file": "packages/Global-Resolver-1.0.1.zip",
+      "sha256": "39e82f60a1388c7a33536338ea6e2980246d142d287d05886a0b77c1a734f417",
+      "publishedAt": "2026-09-23T21:30:40Z",
       "changelog": [
+        "Verifies returned recording identity (Apple ID, file/track ID, ISRC) and rejects mismatches instead of relabelling wrong audio.",
+        "Exposes actual provider title/artist/album/duration/ISRC for app-side validation; preserves only paired response headers.",
+        "Remains an optional secondary source; single-page search by design.",
         "Full-length stream resolution verified to 120 MB continuous (24-bit/88.2 kHz FLAC) through the community resolver instance.",
         "Apple Music catalogue search with Qobuz-first stream resolution.",
         "No credentials required; offline download disabled; honest failure paths."
       ],
       "presentation": {
         "category": "Music",
-        "purpose": "Hi-res full-length music connector",
-        "recommended": true,
+        "purpose": "Optional secondary - hi-res streams (identity-verified)",
+        "recommended": false,
         "language": "Multi-language"
       }
     },
