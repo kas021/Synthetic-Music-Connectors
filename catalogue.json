@@ -8,12 +8,15 @@
       "moduleIdentity": "SP-MUS-3006-MUSIC-GATEWAY",
       "moduleIdentityNumber": 3006,
       "contentType": "music",
-      "version": "1.4.2",
+      "version": "1.4.3",
       "releaseTrack": "staging",
-      "file": "packages/Synthetiq-Music-Gateway-1.4.2.zip",
-      "sha256": "07e5237b0f31060a94c0af403e6af5c7a5f5146048f3cc3afe68d898ef04c232",
-      "publishedAt": "2026-09-23T21:30:40Z",
+      "file": "packages/Synthetiq-Music-Gateway-1.4.3.zip",
+      "sha256": "990cb4e7c5cb6ee90252a29c069a4b4165e6761e30e821b77d3bb8980eaa859f",
+      "publishedAt": "2026-09-24T12:22:17Z",
       "changelog": [
+        "Exact-artist catalogue search with real song/release pagination and artist-credit validation; collaborations retained.",
+        "Source-owned release cards and album tracks; unknown release types remain unclassified, not certified official albums.",
+        "Playback resolution and Smart Radio handlers unchanged from 1.4.2; staged for matching app/device testing.",
         "Strict recording identity: exact provider IDs, Unicode-safe matching, bounded candidate search; no opaque-ID recursion.",
         "Genuine source suggestions exposed via music_radio_v1 (Smart Radio) and related tracks; honest failures instead of filler.",
         "Runtime concurrency capped at one operation; album and home endpoints unchanged.",
@@ -24,7 +27,7 @@
       ],
       "presentation": {
         "category": "Music",
-        "purpose": "Primary music connector - JioSaavn catalogue, verified playback and Smart Radio",
+        "purpose": "Artist catalogue, playback and Smart Radio - staging",
         "recommended": true,
         "language": "Multi-language"
       }

@@ -1,4 +1,4 @@
-# Gateway 1.4.3 — local test candidate, not published
+# Gateway 1.4.3 — owner-approved test-catalogue release
 
 Baseline: published Gateway 1.4.2 at 61f1f60. Stable family and identity are
 unchanged. The app repository's 1.4.1 source copy was not used as a baseline.
@@ -44,8 +44,10 @@ unchanged. The app repository's 1.4.1 source copy was not used as a baseline.
 
 `packages/Synthetiq-Music-Gateway-1.4.3.zip`, root `index.js` and `module.json`.
 SHA-256: `990cb4e7c5cb6ee90252a29c069a4b4165e6761e30e821b77d3bb8980eaa859f`.
-ZIP integrity check passed. Published ZIPs and `catalogue.json` are untouched.
+ZIP integrity check passed. Existing published ZIPs remain unchanged; only the
+Gateway catalogue row is advanced to 1.4.3.
 
-Publication to the test catalogue and phone installation require approval.
+The owner approved test-catalogue publication and an in-place phone update on
+2026-09-24, with an app-data backup before installation.
 Do not promote this candidate to the official catalogue as part of that step.
 Rollback: keep 1.4.2 available; no source family/library identity migration.
