@@ -761,7 +761,210 @@
     catch (_) { return ok([]); }
   }
 
+  // Experimental metadata adapters. No audio URLs, credentials, listening
+  // history or queue state enter this cache. The application owns the session.
+  const RADIO_TTL = 30 * 60 * 1000;
+  const RADIO_ALGORITHM = 'session_based_days_7500_session_300_contribution_5_threshold_15_limit_50_skip_30';
+  const radioStates = new Map();
+  const radioRequests = new Map();
+  let radioSerial = 0;
+  let radioMirrorIndex = 0;
+  let musicBrainzAt = 0;
+  const mbidPattern = /^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/i;
+
+  async function radioJson(url) {
+    // The native bridge cancels this request on expiry. Do not emulate this
+    // with Promise.race: that would leave a live request behind the runtime.
+    const response = await fetch(url, { method: 'GET', timeoutMs: 2000, headers: {
+      Accept: 'application/json',
+      'User-Agent': 'SynthetiqMusicTest/1.4.4 (https://github.com/kas021/Synthetic-Music-Connectors)'
+    }});
+    if (response.status !== 200) throw new Error('Recommendation metadata unavailable');
+    return response.json();
+  }
+
+  async function radioMirror(state, path) {
+    // One request per operation: four source operations fit the app's ten
+    // second refill budget. Rotate after failure for the next retry, without
+    // recursively running the playback waterfall during metadata work.
+    try {
+      const data = await radioJson(MIRRORS[state.mirror] + path);
+      if (!data || !data.data) throw new Error('Invalid catalogue metadata');
+      radioMirrorIndex = state.mirror;
+      return data;
+    } catch (_) {
+      radioMirrorIndex = (state.mirror + 1) % MIRRORS.length;
+    }
+    throw new Error('Recommendation catalogue unavailable');
+  }
+
+  function radioKey(track) {
+    return canonicalIdentityText(track.title) + '|' +
+      canonicalIdentityText(primaryArtist(track.artist));
+  }
+
+  function radioItem(state, track, provider, rank) {
+    if (!track || !usableTrackMetadata(track) || track.title.length > 300 ||
+        track.artist.length > 300 || track.id.length > 256 ||
+        providerIdFromTrackId(track.id) === state.id) return null;
+    const key = radioKey(track);
+    if (state.seen.has(key) || state.ids.has(track.id)) return null;
+    state.seen.add(key);
+    state.ids.add(track.id);
+    return { track, relationship: 'sourceSuggestion', providerRank: rank,
+      recommendationProvider: provider };
+  }
+
+  function takeNative(state, count) {
+    const items = [];
+    while (items.length < count && state.nativeIndex < state.native.length) {
+      const rank = state.nativeIndex++;
+      const item = radioItem(state, state.native[rank], 'jiosaavn', rank);
+      if (item) items.push(item);
+    }
+    return items;
+  }
+
+  async function findRecording(state) {
+    const seed = state.seed;
+    // One request per second at most; do not sleep while owning the JS runtime.
+    if (Date.now() - musicBrainzAt < 1100) throw new Error('Metadata rate limited');
+    musicBrainzAt = Date.now();
+    const quote = value => String(value).replace(/[\\"]/g, '\\$&');
+    const query = 'recording:"' + quote(seed.title) + '" AND artist:"' +
+      quote(primaryArtist(seed.artist)) + '"';
+    const body = await radioJson('https://musicbrainz.org/ws/2/recording/?fmt=json&limit=10&query=' + encodeURIComponent(query));
+    if (!Array.isArray(body?.recordings)) throw new Error('Invalid recording lookup');
+    const exact = body.recordings.slice(0, 10).filter(row => {
+      if (!mbidPattern.test(row.id || '') || String(row.disambiguation || '').trim()) return false;
+      const artist = row['artist-credit']?.[0]?.name;
+      if (!matchesTrackIdentity(seed, { title: row.title, artist })) return false;
+      const seconds = Number(row.length) / 1000;
+      // Duration disambiguates e.g. the 174-second edit from the 187-second
+      // One Dance recording. An absent duration cannot prove that match.
+      return !seed.durationSeconds ||
+        (seconds > 0 && Math.abs(seconds - seed.durationSeconds) <= 5);
+    });
+    const ids = [...new Set(exact.map(row => row.id))];
+    return ids.length === 1 ? ids[0] : null;
+  }
+
+  async function listenBrainzCandidates(state) {
+    const rows = await radioJson('https://labs.api.listenbrainz.org/similar-recordings/json?recording_mbids=' +
+      encodeURIComponent(state.mbid) + '&algorithm=' + RADIO_ALGORITHM);
+    if (!Array.isArray(rows)) throw new Error('Invalid similar-recordings response');
+    const seen = new Set();
+    return rows.slice(0, 50).filter(row => {
+      // Check the response's anchor, not merely its shape. A cached response
+      // for another recording must not start an unrelated recommendation path.
+      if (row.reference_mbid !== state.mbid || !mbidPattern.test(row.recording_mbid || '') ||
+          row.recording_mbid === state.mbid || seen.has(row.recording_mbid) ||
+          typeof row.recording_name !== 'string' || row.recording_name.length > 300 ||
+          typeof row.artist_credit_name !== 'string' || row.artist_credit_name.length > 300) return false;
+      seen.add(row.recording_mbid);
+      return usableTrackMetadata({ title: row.recording_name, artist: row.artist_credit_name });
+    }).slice(0, 40).map((row, rank) => ({
+      title: row.recording_name, artist: row.artist_credit_name,
+      mbid: row.recording_mbid, rank
+    }));
+  }
+
+  async function mapRecommendation(state, wanted) {
+    const response = await radioMirror(state, '/search/songs?query=' +
+      encodeURIComponent(wanted.title + ' ' + primaryArtist(wanted.artist)) + '&page=1&limit=10');
+    const rows = response?.data?.results;
+    if (!Array.isArray(rows)) throw new Error('Invalid candidate search');
+    // Strict matching, no first-result fallback, no live/remix stripping. Use
+    // source-owned metadata, never label a provider recording with LB's title.
+    const exact = rows.slice(0, 10).filter(row => matchesTrackIdentity(wanted, row));
+    const track = exact.map(toTrack).find(Boolean);
+    return radioItem(state, track, 'listenbrainz', wanted.rank);
+  }
+
+  async function hybridRadio(seedId, cursor) {
+    const id = providerIdFromTrackId(seedId);
+    if (!id || !/^[A-Za-z0-9_-]{1,128}$/.test(id)) return fail('Invalid radio seed');
+    const now = Date.now();
+    for (const [key, value] of radioStates) {
+      if (now - value.at >= RADIO_TTL || (value.retryAt && now >= value.retryAt)) radioStates.delete(key);
+    }
+    let state = radioStates.get(id);
+    let step = 0;
+    if (cursor) {
+      const match = typeof cursor === 'string' && cursor.match(/^lb1\.([a-z0-9-]{1,40})\.(\d{1,2})$/);
+      if (!match) return fail('Invalid radio cursor');
+      if (state && match[1] !== state.token) return fail('Radio cursor belongs to another session');
+      if (state) step = Number(match[2]);
+      // Cache lost on native runtime recreation or TTL: restart bounded pages.
+      // The app retains session exclusions, so this can never authorize repeats.
+    }
+    if (!state) {
+      state = { id, at: now, token: now.toString(36) + '-' + (++radioSerial).toString(36),
+        mirror: radioMirrorIndex, phase: 'native', native: [], nativeIndex: 0, similar: [],
+        similarIndex: 0, seen: new Set(), ids: new Set(), pages: [] };
+      radioStates.set(id, state);
+      while (radioStates.size > 4) radioStates.delete(radioStates.keys().next().value);
+    }
+    if (state.pages[step]) return state.pages[step]; // Idempotent cursor replay.
+    if (step !== state.pages.length || step > 47) return fail('Radio cursor is out of sequence');
+    let items = [];
+    try {
+      if (state.phase === 'native') {
+        const response = await radioMirror(state, '/songs/' + encodeURIComponent(id) + '/suggestions?limit=40');
+        const rows = Array.isArray(response.data) ? response.data : response.data.results;
+        if (!Array.isArray(rows)) throw new Error('Invalid suggestions');
+        state.native = rows.slice(0, 80).map(toTrack).filter(Boolean).slice(0, 40);
+        items = takeNative(state, 6);
+        state.phase = 'seed';
+      } else if (state.phase === 'seed') {
+        const response = await radioMirror(state, '/songs/' + encodeURIComponent(id));
+        const row = findMirrorSong(response, id);
+        state.seed = row && usableTrackMetadata(row) ? toTrack(row) : null;
+        state.phase = state.seed ? 'mbid' : 'remaining';
+      } else if (state.phase === 'mbid') {
+        state.mbid = await findRecording(state);
+        state.phase = state.mbid ? 'similar' : 'remaining';
+      } else if (state.phase === 'similar') {
+        state.similar = await listenBrainzCandidates(state);
+        state.phase = 'mapping';
+      } else if (state.phase === 'mapping' && state.similarIndex < state.similar.length) {
+        // One candidate and one request per operation. Yield to
+        // playback between operations instead of doing fifty searches at once.
+        const item = await mapRecommendation(state, state.similar[state.similarIndex]);
+        state.similarIndex++;
+        if (item) items.push(item);
+      }
+    } catch (_) {
+      if (state.phase === 'native') {
+        radioStates.delete(id);
+        return fail('Related tracks temporarily unavailable');
+      }
+      // An optional engine outage must not discard native suggestions. Short
+      // cooldown, not a permanent cached empty result; a new request can retry.
+      state.retryAt = Date.now() + 30000;
+      state.phase = 'remaining';
+    }
+    items.push(...takeNative(state, 2));
+    const more = state.nativeIndex < state.native.length ||
+      ['seed', 'mbid', 'similar'].includes(state.phase) ||
+      (state.phase === 'mapping' && state.similarIndex < state.similar.length);
+    const result = ok({ version: 1, items, nextCursor: more && step < 47
+      ? 'lb1.' + state.token + '.' + (step + 1) : null });
+    state.pages.push(result);
+    return result;
+  }
+
   async function getRadioCandidates(seedId, cursor) {
+    if (globalThis.__synthetiqBoundedFetchVersion === 1) {
+      const key = String(seedId) + '\n' + String(cursor || '');
+      if (radioRequests.has(key)) return radioRequests.get(key);
+      if (radioRequests.size) return fail('Radio metadata is busy; retry');
+      const call = hybridRadio(seedId, cursor);
+      radioRequests.set(key, call);
+      try { return await call; } finally { radioRequests.delete(key); }
+    }
+    // Older installed apps retain the proven native-only path. The additional
+    // provider requests require the host's shorter, cancellable fetch contract.
     if (cursor) return ok({version: 1, items: [], nextCursor: null});
     try {
       const tracks = await radioSuggestions(seedId);
