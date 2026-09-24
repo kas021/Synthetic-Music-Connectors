@@ -6,7 +6,7 @@
   "contentType": "music",
   "contractVersion": 4,
   "formatVersion": 3,
-  "moduleVersion": "1.4.2",
+  "moduleVersion": "1.4.3",
   "moduleFamilyId": "synthetiq_music_gateway",
   "moduleIdentity": "SP-MUS-3006-MUSIC-GATEWAY",
   "moduleIdentityNumber": 3006,

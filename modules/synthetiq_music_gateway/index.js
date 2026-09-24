@@ -299,6 +299,7 @@
       title,
       artist,
       album,
+      albumId: item.album?.id ? 'album:' + item.album.id : undefined,
       image,
       durationSeconds
     };
@@ -549,13 +550,83 @@
     return null;
   }
 
+  // Positive/negative artist lookup metadata only; never retain audio routes.
+  const artistQueries = new Map();
+  async function exactArtist(term) {
+    const key = canonicalIdentityText(term);
+    const cached = artistQueries.get(key);
+    if (cached && Date.now() - cached.at < 30 * 60 * 1000) return cached.artist;
+    const response = await mirrorGet('/search/artists?query=' + encodeURIComponent(term) + '&page=1&limit=10');
+    const rows = response?.data?.results || response?.results;
+    if (!Array.isArray(rows)) return null; // Do not cache transport failure.
+    const matches = rows.filter(row => row.id && canonicalIdentityText(row.name || '') === key);
+    // Ambiguous names stay general searches rather than guessing an identity.
+    const artist = matches.length === 1 ? { id: String(matches[0].id), name: String(matches[0].name) } : null;
+    artistQueries.set(key, { at: Date.now(), artist });
+    while (artistQueries.size > 24) artistQueries.delete(artistQueries.keys().next().value);
+    return artist;
+  }
+
+  function creditedArtist(item, artist) {
+    const credits = item?.artists?.primary;
+    if (Array.isArray(credits)) {
+      return credits.some(credit => String(credit.id) === artist.id &&
+        canonicalIdentityText(credit.name || '') === canonicalIdentityText(artist.name));
+    }
+    const text = item?.primaryArtists || item?.primary_artists || item?.artist || '';
+    return String(text).split(/[,;&]/).some(name => canonicalIdentityText(name) === canonicalIdentityText(artist.name));
+  }
+
+  function toAlbum(item) {
+    if (!item?.id || !(item.name || item.title)) return null;
+    let image = item.image || item.imageUrl;
+    if (Array.isArray(image)) image = image[image.length - 1]?.url;
+    const artist = Array.isArray(item.artists?.primary)
+      ? item.artists.primary.map(credit => credit.name).join(', ')
+      : String(item.primaryArtists || item.artist || '');
+    const kind = String(item.releaseType || item.record_type || '').toLowerCase();
+    return {
+      type: 'album', id: 'album:' + item.id, title: String(item.name || item.title), artist, image,
+      year: item.year ? String(item.year) : undefined,
+      trackCount: Number(item.songCount) || undefined,
+      // The upstream generic `type: album` includes singles. Do not invent
+      // a release classification from that container type or a track count.
+      releaseType: ['album', 'single', 'ep'].includes(kind) ? kind : 'unknown'
+    };
+  }
+
+  async function artistCatalogue(artist, page) {
+    const base = '/artists/' + encodeURIComponent(artist.id);
+    const suffix = '?page=' + page + '&sortBy=popularity&sortOrder=desc';
+    // Artist endpoints are zero-based (song keyword search is one-based).
+    // Sequential calls respect the runtime's bounded provider concurrency.
+    const songs = await mirrorGet(base + '/songs' + suffix);
+    const albums = await mirrorGet(base + '/albums' + suffix);
+    if (!Array.isArray(songs?.data?.songs) || !Array.isArray(albums?.data?.albums)) {
+      return fail('Artist catalogue is temporarily unavailable. Retry this page.');
+    }
+    const tracks = songs.data.songs.slice(0, 40).filter(item => creditedArtist(item, artist)).map(toTrack).filter(Boolean);
+    const releases = albums.data.albums.slice(0, 40).filter(item => creditedArtist(item, artist)).map(toAlbum).filter(Boolean);
+    return ok([...releases, ...tracks]);
+  }
+
   async function searchResults(query, page) {
     const term = String(query || '').trim();
     if (!term) return ok([]);
+    const pageIndex = Math.max(0, Math.min(59, Math.floor(Number(page) || 0)));
+    const artist = await exactArtist(term);
+    if (artist) return artistCatalogue(artist, pageIndex);
+    return searchSongs(term, pageIndex);
+  }
+
+  async function searchSongs(query, page) {
+    const term = String(query || '').trim();
+    if (!term) return ok([]);
+    const pageIndex = Math.max(0, Math.min(59, Math.floor(Number(page) || 0)));
 
     // 1. Try ListenFree mirrors
     try {
-      const p = Number(page) + 1 || 1;
+      const p = pageIndex + 1;
       const res = await mirrorGet('/search/songs?query=' + encodeURIComponent(term) + '&page=' + p + '&limit=24');
       const results = res?.data?.results || res?.results || [];
       if (results.length) {
@@ -565,7 +636,7 @@
 
     // 2. Try direct JioSaavn API
     try {
-      const p = Number(page) + 1 || 1;
+      const p = pageIndex + 1;
       const jio = await directJioSaavn({
         '__call': 'search.getSongSearchResults',
         'q': term,
@@ -602,7 +673,7 @@
     // intentionally not guessed.
     if (queryForFallback) {
       try {
-        const searchRes = await searchResults(queryForFallback.query, 0);
+        const searchRes = await searchSongs(queryForFallback.query, 0);
         if (searchRes.ok) {
           const items = JSON.parse(searchRes.data);
           const seen = new Set();
@@ -636,16 +707,10 @@
     try {
       const res = await mirrorGet('/albums?id=' + encodeURIComponent(cleanId));
       const data = res?.data;
-      if (data) {
+      if (data && String(data.id) === cleanId) {
         const tracks = (data.songs || []).map(toTrack).filter(Boolean);
-        return ok({
-          id: cleanId,
-          title: String(data.name || 'Album'),
-          artist: String(data.primaryArtists || 'Various Artists'),
-          image: Array.isArray(data.image) ? data.image[data.image.length - 1]?.url : data.image,
-          year: data.year ? String(data.year) : undefined,
-          tracks
-        });
+        const album = toAlbum(data);
+        if (album) return ok({ ...album, tracks });
       }
     } catch (_) {}
     return fail('Album details unavailable.');
