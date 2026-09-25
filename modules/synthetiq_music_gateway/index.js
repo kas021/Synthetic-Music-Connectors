@@ -619,6 +619,43 @@
     return searchSongs(term, pageIndex);
   }
 
+  async function searchAlbums(query, page) {
+    const term = String(query || '').trim();
+    if (!term) return ok([]);
+    const pageIndex = Math.max(0, Math.min(59, Math.floor(Number(page) || 0)));
+
+    // Exact artist lookups use the provider's zero-based artist release pages.
+    // Other queries use the provider's one-based album-search endpoint.
+    try {
+      const artist = await exactArtist(term);
+      if (artist) {
+        const suffix = '?page=' + pageIndex + '&sortBy=popularity&sortOrder=desc';
+        const response = await mirrorGet(
+          '/artists/' + encodeURIComponent(artist.id) + '/albums' + suffix,
+          data => Array.isArray(data?.data?.albums)
+        );
+        if (!Array.isArray(response?.data?.albums)) {
+          return fail('Artist releases are temporarily unavailable. Retry this page.');
+        }
+        return ok(response.data.albums
+          .slice(0, 40)
+          .filter(item => creditedArtist(item, artist))
+          .map(toAlbum)
+          .filter(Boolean));
+      }
+
+      const response = await mirrorGet(
+        '/search/albums?query=' + encodeURIComponent(term) +
+          '&page=' + (pageIndex + 1) + '&limit=24',
+        data => Array.isArray(data?.data?.results || data?.results)
+      );
+      const results = response?.data?.results || response?.results || [];
+      return ok(results.slice(0, 24).map(toAlbum).filter(Boolean));
+    } catch (_) {
+      return fail('Album search is temporarily unavailable. Retry this page.');
+    }
+  }
+
   async function searchSongs(query, page) {
     const term = String(query || '').trim();
     if (!term) return ok([]);
@@ -976,6 +1013,7 @@
   globalThis.getRadioCandidates = getRadioCandidates;
 
   globalThis.searchResults = searchResults;
+  globalThis.searchAlbums = searchAlbums;
   globalThis.homeSections = homeSections;
   globalThis.extractDetails = extractDetails;
   globalThis.extractTracks = extractTracks;

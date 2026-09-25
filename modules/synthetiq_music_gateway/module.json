@@ -6,7 +6,7 @@
   "contentType": "music",
   "contractVersion": 4,
   "formatVersion": 3,
-  "moduleVersion": "1.4.4",
+  "moduleVersion": "1.4.5",
   "moduleFamilyId": "synthetiq_music_gateway",
   "moduleIdentity": "SP-MUS-3006-MUSIC-GATEWAY",
   "moduleIdentityNumber": 3006,
@@ -16,6 +16,7 @@
     "capabilities": {
       "music_home_v1": true,
       "local_listening_stats_v1": true,
+      "music_album_search_v1": true,
       "music_radio_v1": true
     },
     "runtime": {

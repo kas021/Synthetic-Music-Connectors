@@ -6,15 +6,16 @@
   "contentType": "music",
   "contractVersion": 4,
   "formatVersion": 3,
-  "moduleVersion": "1.0.1",
+  "moduleVersion": "1.0.2",
   "moduleFamilyId": "freefy_music",
   "moduleIdentity": "SP-MUS-3010-FREEFY",
   "moduleIdentityNumber": 3010,
-  "releaseTrack": "production",
+  "releaseTrack": "staging",
   "baseUrl": "https://music.youtube.com",
   "config": {
     "capabilities": {
       "music_home_v1": true,
+      "music_album_search_v1": true,
       "local_listening_stats_v1": true
     },
     "runtime": {
@@ -30,5 +31,5 @@
     "playbackMode": "full",
     "allowOfflineDownload": true
   },
-  "moduleStatus": "production"
+  "moduleStatus": "staging"
 }

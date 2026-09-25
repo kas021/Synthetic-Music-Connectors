@@ -197,13 +197,61 @@
     return fail('No full-length audio stream is available for this track.');
   }
 
+  function toAlbum(item) {
+    const id = item?.providerItemId || item?.id || item?.albumId;
+    const title = item?.name || item?.title;
+    if (!id || !title) return null;
+    let image = item.image || item.imageUrl;
+    if (Array.isArray(image)) image = image[image.length - 1]?.url;
+    const artist = Array.isArray(item.artists?.primary)
+      ? item.artists.primary.map(credit => credit.name).filter(Boolean).join(', ')
+      : String(item.primaryArtists || item.primary_artists || item.artist || '');
+    const releaseType = String(item.releaseType || item.record_type || '').toLowerCase();
+    return {
+      type: 'album',
+      id: 'album:' + String(id),
+      title: String(title),
+      artist,
+      image,
+      year: item.year ? String(item.year) : undefined,
+      trackCount: Number(item.songCount || item.song_count) || undefined,
+      releaseType: ['album', 'single', 'ep'].includes(releaseType) ? releaseType : 'unknown'
+    };
+  }
+
+  // Freefy's supported album catalogue is ListenFree/JioSaavn only. YouTube
+  // Music search remains song-only and is never treated as album evidence.
+  async function searchAlbums(query, page) {
+    const term = String(query || '').trim();
+    if (!term) return ok([]);
+    const pageIndex = Math.max(0, Math.min(59, Math.floor(Number(page) || 0)));
+    let gotResponse = false;
+    for (const mirror of LISTENFREE_MIRRORS) {
+      try {
+        const url = mirror + '/search/albums?query=' + encodeURIComponent(term) +
+          '&page=' + (pageIndex + 1) + '&limit=20';
+        const response = await getJson(url);
+        const results = response?.data?.results || response?.results;
+        if (Array.isArray(results)) {
+          gotResponse = true;
+          const albums = results.slice(0, 20).map(toAlbum).filter(Boolean);
+          if (albums.length) return ok(albums);
+        }
+      } catch (_) {}
+    }
+    return gotResponse
+      ? ok([])
+      : fail('Album search is temporarily unavailable. Retry this page.');
+  }
+
   async function extractDetails(id) {
     const cleanId = String(id || '').replace(/^(album|playlist|freefy):/, '').trim();
     for (const mirror of LISTENFREE_MIRRORS) {
       try {
         const res = await getJson(mirror + '/albums?id=' + encodeURIComponent(cleanId));
         const data = res?.data;
-        if (data) {
+        if (data && String(data.id || '') === cleanId) {
+          const release = toAlbum(data);
           const tracks = (data.songs || []).map(s => ({
             id: 'freefy:saavn:' + s.id,
             href: 'freefy:saavn:' + s.id,
@@ -215,11 +263,13 @@
             durationSeconds: Number(s.duration) || undefined
           }));
           return ok({
-            id: cleanId,
+            id: 'album:' + cleanId,
             title: String(data.name || 'Album'),
-            artist: String(data.primaryArtists || 'Various Artists'),
+            artist: release?.artist || '',
             image: Array.isArray(data.image) ? data.image[data.image.length - 1]?.url : data.image,
             year: data.year ? String(data.year) : undefined,
+            trackCount: Number(data.songCount || data.song_count) || undefined,
+            releaseType: release?.releaseType || 'unknown',
             tracks
           });
         }
@@ -257,6 +307,7 @@
   }
 
   globalThis.searchResults = searchResults;
+  globalThis.searchAlbums = searchAlbums;
   globalThis.homeSections = homeSections;
   globalThis.extractDetails = extractDetails;
   globalThis.extractTracks = extractTracks;
