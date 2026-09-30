@@ -15,6 +15,13 @@ In Synthetiq Music, open **Settings → Sources → Advanced**, then paste:
 The app downloads the package named by `catalogue.json`, verifies its SHA-256,
 and installs it as a user-selected source.
 
+The installable `modules` list currently contains only Synthetiq Music Gateway
+1.4.3. Freefy Music, Global Resolver, and YT Music Direct remain in
+`disabledModules` with their versioned packages intact for audit and rollback;
+they are not offered by the normal in-app catalogue picker. This catalogue
+change does not remotely disable copies users already installed, and someone
+with a direct package URL can still access those public ZIPs.
+
 ## Current connector
 
 `Synthetiq Music Gateway` is an isolated staging connector. It calls only the

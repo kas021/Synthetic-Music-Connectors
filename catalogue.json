@@ -31,13 +31,16 @@
         "recommended": true,
         "language": "Multi-language"
       }
-    },
+    }
+  ],
+  "disabledModules": [
     {
       "moduleId": "freefy-music-v1",
       "moduleFamilyId": "freefy_music",
       "moduleIdentity": "SP-MUS-3010-FREEFY",
       "moduleIdentityNumber": 3010,
       "contentType": "music",
+      "availability": "disabled",
       "version": "1.0.1",
       "releaseTrack": "production",
       "file": "packages/Freefy-Music-1.0.1.zip",
@@ -63,6 +66,7 @@
       "moduleIdentity": "SP-MUS-3030-GLOBAL-RESOLVER",
       "moduleIdentityNumber": 3030,
       "contentType": "music",
+      "availability": "disabled",
       "version": "1.0.1",
       "releaseTrack": "staging",
       "file": "packages/Global-Resolver-1.0.1.zip",
@@ -89,6 +93,7 @@
       "moduleIdentity": "SP-MUS-3031-YTMUSIC-DIRECT",
       "moduleIdentityNumber": 3031,
       "contentType": "music",
+      "availability": "disabled",
       "version": "1.0.0",
       "releaseTrack": "staging",
       "file": "packages/YT-Music-Direct-1.0.0.zip",
