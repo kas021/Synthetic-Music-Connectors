@@ -8,12 +8,17 @@
       "moduleIdentity": "SP-MUS-3006-MUSIC-GATEWAY",
       "moduleIdentityNumber": 3006,
       "contentType": "music",
-      "version": "1.4.3",
+      "version": "1.4.7",
       "releaseTrack": "staging",
-      "file": "packages/Synthetiq-Music-Gateway-1.4.3.zip",
-      "sha256": "990cb4e7c5cb6ee90252a29c069a4b4165e6761e30e821b77d3bb8980eaa859f",
-      "publishedAt": "2026-09-24T12:22:17Z",
+      "file": "packages/Synthetiq-Music-Gateway-1.4.7.zip",
+      "sha256": "aee922442aa36328f9c7aec0192be29ff608de59ad9bfab1271a403be6d47f1e",
+      "publishedAt": "2026-10-03T15:14:07Z",
       "changelog": [
+        "Recover exact studio tracks hidden by karaoke/type-beat keyword results using bounded title-only and verified artist catalogue searches.",
+        "Fix saved metadata-only requests such as i need u by Ken Carson; retain source family and provider IDs.",
+        "Cap search/playback recovery at eight requests and 7.5 seconds; preserve title/artist/version checks and reject changed detail duration/ISRC.",
+        "Prefer HTTPS audio alternatives; do not cache empty artist responses; no new provider or server deployment is included.",
+        "Manifest offline permission retained; older app binaries need the matching exact-package approval before new offline downloads are allowed.",
         "Exact-artist catalogue search with real song/release pagination and artist-credit validation; collaborations retained.",
         "Source-owned release cards and album tracks; unknown release types remain unclassified, not certified official albums.",
         "Playback resolution and Smart Radio handlers unchanged from 1.4.2; staged for matching app/device testing.",
@@ -27,7 +32,7 @@
       ],
       "presentation": {
         "category": "Music",
-        "purpose": "Artist catalogue, playback and Smart Radio - staging",
+        "purpose": "Gateway playback with verified bounded catalogue recovery",
         "recommended": true,
         "language": "Multi-language"
       }

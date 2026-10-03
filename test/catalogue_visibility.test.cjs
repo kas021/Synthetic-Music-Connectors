@@ -11,7 +11,7 @@ test('only the verified Gateway is offered for normal installation', () => {
   assert.deepEqual(catalogue.modules.map(entry => entry.moduleFamilyId), [
     'synthetiq_music_gateway',
   ]);
-  assert.equal(catalogue.modules[0].version, '1.4.3');
+  assert.equal(catalogue.modules[0].version, '1.4.7');
   assert.deepEqual(new Set(catalogue.disabledModules.map(entry => entry.moduleFamilyId)), new Set([
     'freefy_music',
     'synthetiq_global_resolver',
