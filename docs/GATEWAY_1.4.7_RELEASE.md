@@ -42,8 +42,16 @@ Two serial frozen-corpus runs of the release candidate returned 73/100, preservi
 all 70 recorded baseline routes; MIA, Smells Like Teen Spirit and How You Like That
 were recovered. The second run preceded the final Home/error-boundary hardening;
 its source hash is retained separately in the app-side evidence. Do not conflate
-that report with exact final package testing. A post-publication check must use
-the downloaded final package, matching its hash and source bytes.
+that report with exact final package testing.
+
+Post-publication verification downloaded the public main catalogue and final ZIP
+back from GitHub: version/hash and source bytes matched. The downloaded package
+passed the same 30 targeted Flutter tests, including five native-runtime fixtures.
+Its final serial 100-song run returned 73 metadata-compatible audio routes,
+preserving all 70 historical baseline routes; the additional Ken Carson request
+also passed. One route exceeded eight seconds for combined search+resolution;
+individual operations were bounded. All four priority head/later-range samples
+passed. These remain route/sample checks, not complete audible phone playback.
 
 The reported exact saved ID resolved live in 2,032 ms; Ken Carson metadata was
 correct, the head decoded, and later range bytes were served at HTTP 206.
