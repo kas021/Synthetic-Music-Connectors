@@ -16,6 +16,22 @@
   const MAX_DIRECT_ITEMS = 16;
   const MAX_FALLBACK_SEARCH_RESULTS = 24;
   const MAX_FALLBACK_CANDIDATES = 5;
+  // Recovery is a bounded source lookup, not a recursive catalogue walk.
+  let lookupOperation = null;
+  async function boundedLookup(handler, args) {
+    if (lookupOperation) return fail('Source lookup is busy. Retry.');
+    lookupOperation = { ends: Date.now() + 7500, calls: 0 };
+    try {
+      const result = await handler(...args);
+      return Date.now() < lookupOperation.ends ? result : fail('Source lookup deadline exceeded. Retry.');
+    }
+    catch (_) { return fail('Source lookup failed. Retry.'); }
+    finally { lookupOperation = null; }
+  }
+  function canRecover(reserve = 1) {
+    return !!lookupOperation &&
+      (lookupOperation.calls + reserve < 8 && Date.now() + 700 < lookupOperation.ends);
+  }
   const RECORDING_VARIANTS = new Set([
     'instrumental',
     'karaoke',
@@ -33,7 +49,8 @@
     'remaster',
     'remastered',
     'mono',
-    'nightcore'
+    'nightcore',
+    'drumless'
   ]);
   const ALLOWED_TITLE_SUFFIXES = new Set([
     'explicit',
@@ -247,7 +264,12 @@
       'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/137.0.0.0 Safari/537.36'
     };
     try {
-      const res = await fetch(url, { method: 'GET', headers });
+      if (!/^https:\/\//i.test(String(url))) return null;
+      if (lookupOperation && (lookupOperation.calls >= 8 || Date.now() + 200 >= lookupOperation.ends)) return null;
+      if (lookupOperation) lookupOperation.calls++;
+      const timeoutMs = lookupOperation
+        ? Math.max(200, Math.min(3000, lookupOperation.ends - Date.now())) : 4000;
+      const res = await fetch(url, { method: 'GET', headers, timeoutMs });
       if (res.status === 200) {
         return await res.json();
       }
@@ -301,7 +323,8 @@
       album,
       albumId: item.album?.id ? 'album:' + item.album.id : undefined,
       image,
-      durationSeconds
+      durationSeconds,
+      isrc: validIsrc(item.isrc || item.more_info?.isrc) || undefined
     };
   }
 
@@ -399,9 +422,20 @@
     const candidateTitle = canonicalIdentityText(candidateMetadata.title);
     const wantedArtist = canonicalIdentityText(primaryArtist(wantedMetadata.artist));
     const candidateArtist = canonicalIdentityText(primaryArtist(candidateMetadata.artist));
+    const wantedIsrc = validIsrc(wanted.isrc || wanted.more_info?.isrc);
+    const candidateIsrc = validIsrc(candidate.isrc || candidate.more_info?.isrc);
+    if (wantedIsrc && candidateIsrc && wantedIsrc !== candidateIsrc) return false;
+    const a = Number(wanted.durationSeconds || wanted.duration);
+    const b = Number(candidate.durationSeconds || candidate.duration);
+    if (a > 0 && b > 0 && Math.abs(a - b) > Math.max(20, Math.min(90, Math.round(a * 0.15)))) return false;
     return strongTitleMatch(wantedTitle, candidateTitle) &&
       wantedArtist === candidateArtist &&
       sameVariantSet(recordingVariants(wanted), recordingVariants(candidate));
+  }
+
+  function validIsrc(value) {
+    const normalized = String(value || '').replace(/[-\s]/g, '').toUpperCase();
+    return /^[A-Z]{2}[A-Z0-9]{3}\d{7}$/.test(normalized) ? normalized : '';
   }
 
   function hasProviderIdentity(item, expectedId) {
@@ -461,7 +495,7 @@
     let streamFallback = null;
     for (const entry of songData.downloadUrl) {
       const url = entry && entry.url ? String(entry.url).trim() : '';
-      if (!url) continue;
+      if (!/^https:\/\//i.test(url)) continue;
       if (String(entry.quality || '').indexOf('320') !== -1) stream320 = url;
       streamFallback = url;
     }
@@ -562,7 +596,8 @@
     const matches = rows.filter(row => row.id && canonicalIdentityText(row.name || '') === key);
     // Ambiguous names stay general searches rather than guessing an identity.
     const artist = matches.length === 1 ? { id: String(matches[0].id), name: String(matches[0].name) } : null;
-    artistQueries.set(key, { at: Date.now(), artist });
+    // Empty indexes can be transient. Cache only positively verified artists.
+    if (artist) artistQueries.set(key, { at: Date.now(), artist });
     while (artistQueries.size > 24) artistQueries.delete(artistQueries.keys().next().value);
     return artist;
   }
@@ -616,7 +651,53 @@
     const pageIndex = Math.max(0, Math.min(59, Math.floor(Number(page) || 0)));
     const artist = await exactArtist(term);
     if (artist) return artistCatalogue(artist, pageIndex);
-    return searchSongs(term, pageIndex);
+    const result = await searchSongs(term, pageIndex);
+    if (pageIndex !== 0 || !result.ok) return result;
+    const rows = JSON.parse(result.data);
+    // An exact title+artist request can be buried below karaoke/type-beat
+    // results. Resolve the artist suffix, then recover only strict recordings.
+    const words = term.split(/\s+/);
+    if (words.length < 2 || words.length > 32) return result;
+    for (const size of [...new Set([Math.min(2, words.length - 1), 1, Math.min(4, words.length - 1)])]) {
+      if (!canRecover(2)) break;
+      const identityArtist = await exactArtist(words.slice(-size).join(' '));
+      if (!identityArtist) continue;
+      const wanted = { title: words.slice(0, -size).join(' '), artist: identityArtist.name };
+      const recovered = await recoverRecording(wanted, rows, identityArtist);
+      const ordered = [...recovered, ...rows.filter(row =>
+        canonicalIdentityText(primaryArtist(row.artist)) === canonicalIdentityText(identityArtist.name))];
+      // A suffix may also be an ordinary title word that happens to name an
+      // artist. Do not blank an otherwise valid broad search on that guess.
+      if (!ordered.length) continue;
+      const seen = new Set();
+      return ok(ordered.filter(row => row.id && !seen.has(row.id) && seen.add(row.id)).slice(0, 64));
+    }
+    return result;
+  }
+
+  async function recoverRecording(wanted, initial, verifiedArtist) {
+    let tracks = Array.isArray(initial) ? initial.slice(0, 64) : [];
+    const selected = () => tracks.filter(track => matchesTrackIdentity(wanted, track)).slice(0, MAX_FALLBACK_CANDIDATES);
+    if (selected().length) return selected();
+    // A title-only catalogue query often exposes a buried studio recording.
+    // Artist/version checks remain mandatory before either search or playback.
+    if (canRecover(2)) {
+      const byTitle = await searchSongs(wanted.title, 0);
+      if (byTitle.ok) tracks = tracks.concat(JSON.parse(byTitle.data));
+    }
+    if (selected().length) return selected();
+    let artist = verifiedArtist;
+    if (!artist && canRecover(2)) artist = await exactArtist(primaryArtist(wanted.artist));
+    if (!artist) return [];
+    for (let page = 0; page < 3 && canRecover(1); page++) {
+      const response = await mirrorGet('/artists/' + encodeURIComponent(artist.id) +
+        '/songs?page=' + page + '&sortBy=popularity&sortOrder=desc');
+      const rows = response?.data?.songs;
+      if (!Array.isArray(rows) || !rows.length) break;
+      tracks = tracks.concat(rows.slice(0, 40).filter(row => creditedArtist(row, artist)).map(toTrack).filter(Boolean));
+      if (selected().length) return selected();
+    }
+    return selected();
   }
 
   async function searchSongs(query, page) {
@@ -675,7 +756,7 @@
       try {
         const searchRes = await searchSongs(queryForFallback.query, 0);
         if (searchRes.ok) {
-          const items = JSON.parse(searchRes.data);
+          const items = await recoverRecording(queryForFallback, JSON.parse(searchRes.data));
           const seen = new Set();
           let attempts = 0;
           const boundedItems = Array.isArray(items)
@@ -691,7 +772,7 @@
             const resolved = await resolveProviderTrack(
               providerId,
               quality,
-              queryForFallback
+              item
             );
             if (resolved) return resolved;
           }
@@ -772,10 +853,10 @@
   }
   globalThis.getRadioCandidates = getRadioCandidates;
 
-  globalThis.searchResults = searchResults;
+  globalThis.searchResults = (...args) => boundedLookup(searchResults, args);
   globalThis.homeSections = homeSections;
   globalThis.extractDetails = extractDetails;
   globalThis.extractTracks = extractTracks;
-  globalThis.extractAudioUrl = extractAudioUrl;
+  globalThis.extractAudioUrl = (...args) => boundedLookup(extractAudioUrl, args);
   globalThis.getRelatedTracks = getRelatedTracks;
 })();
