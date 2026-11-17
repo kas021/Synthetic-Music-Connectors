@@ -1,0 +1,30 @@
+{
+  "schemaVersion": 1,
+  "repository": "Synthetic Music Connectors — ONE owner pilot",
+  "modules": [
+    {
+      "moduleId": "synthetiq-one-music-pilot-v1",
+      "moduleFamilyId": "synthetiq_one_music",
+      "moduleIdentity": "SP-MUS-3040-ONE-MUSIC",
+      "moduleIdentityNumber": 3040,
+      "contentType": "music",
+      "version": "0.1.0",
+      "releaseTrack": "staging",
+      "file": "packages/Synthetiq-ONE-Music-0.1.0.zip",
+      "sha256": "95a4063d5b343333c371c5b9e1fe781a9d3c72939d7e7a8b0d4fbb215f60f2a0",
+      "publishedAt": "2026-11-17T13:17:05Z",
+      "changelog": [
+        "Owner-only iPhone pilot for 999 validated stored recordings; requires the matching native-auth test build and approved account/device.",
+        "Native App Attest and short-lived control/media authorization; no credentials, audio or resolved streams in the package.",
+        "Stored search and playback only. No upstream fetching, albums, radio, offline downloads or export in this pilot.",
+        "Older apps fail closed. Public package visibility does not grant access to the backend."
+      ],
+      "presentation": {
+        "category": "Music",
+        "purpose": "Private owner test only — matching iPhone build and approved device required",
+        "recommended": false,
+        "language": "Multi-language"
+      }
+    }
+  ]
+}

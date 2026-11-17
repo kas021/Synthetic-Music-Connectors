@@ -1,0 +1,21 @@
+{
+  "id": "synthetiq-one-music-pilot-v1",
+  "name": "Synthetiq ONE Music — Private Pilot",
+  "description": "Validated ONE catalogue. Requires the matching native-auth test build; older builds cannot play this source.",
+  "type": "client",
+  "contentType": "music",
+  "contractVersion": 4,
+  "formatVersion": 3,
+  "moduleVersion": "0.1.0",
+  "moduleFamilyId": "synthetiq_one_music",
+  "releaseTrack": "staging",
+  "baseUrl": "https://music-api.synthetiq.uk",
+  "config": {
+    "capabilities": { "music_one_transport_v1": true },
+    "runtime": { "mode": "local", "entry": "index.js" },
+    "playbackMode": "full",
+    "allowOfflineDownload": false,
+    "allowFileExport": false
+  },
+  "moduleStatus": "staging"
+}
